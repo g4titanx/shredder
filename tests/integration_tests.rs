@@ -1,11 +1,13 @@
-use secure_wipe::{
-    SecureWipe,
-    standards::{WipeStandard, Nist80088Config, LegacyConfig, LegacyStandard, SanitizationMethod, VerificationLevel},
-    storage::{StorageType, StorageCapabilities},
-    WipeError,
+use shredder::{
+    standards::{
+        LegacyConfig, LegacyStandard, Nist80088Config, SanitizationMethod, VerificationLevel,
+        WipeStandard,
+    },
+    storage::{StorageCapabilities, StorageType},
+    Shredder, WipeError,
 };
 use std::fs::File;
-use std::io::{Write, Read};
+use std::io::{Read, Write};
 use tempfile::tempdir;
 
 mod common;
@@ -14,14 +16,14 @@ mod common;
 fn test_secure_deletion_modern() {
     let dir = tempdir().unwrap();
     let file_path = dir.path().join("test_file.txt");
-    
+
     // Create test file
     let mut file = File::create(&file_path).unwrap();
     file.write_all(b"sensitive data").unwrap();
     drop(file);
 
     // Configure secure deletion
-    let wiper = SecureWipe::new(
+    let wiper = Shredder::new(
         WipeStandard::Modern(Nist80088Config {
             method: SanitizationMethod::Clear,
             verify_level: VerificationLevel::Full,
@@ -31,7 +33,7 @@ fn test_secure_deletion_modern() {
             supports_secure_erase: false,
             supports_nvme_sanitize: false,
             has_wear_leveling: false,
-        })
+        }),
     );
 
     // Perform deletion
@@ -45,7 +47,7 @@ fn test_secure_deletion_modern() {
 fn test_secure_deletion_legacy_dod() {
     let dir = tempdir().unwrap();
     let file_path = dir.path().join("test_file_dod.txt");
-    
+
     // Create and fill test file
     let mut file = File::create(&file_path).unwrap();
     let test_data = vec![0xAA; 1024]; // 1KB of test data
@@ -53,7 +55,7 @@ fn test_secure_deletion_legacy_dod() {
     drop(file);
 
     // Configure DoD secure deletion
-    let wiper = SecureWipe::new(
+    let wiper = Shredder::new(
         WipeStandard::Legacy(LegacyConfig {
             standard: LegacyStandard::Dod522022M,
             extra_verification: true,
@@ -63,7 +65,7 @@ fn test_secure_deletion_legacy_dod() {
             supports_secure_erase: false,
             supports_nvme_sanitize: false,
             has_wear_leveling: false,
-        })
+        }),
     );
 
     // Perform deletion
@@ -77,14 +79,14 @@ fn test_secure_deletion_legacy_dod() {
 fn test_ssd_specific_deletion() {
     let dir = tempdir().unwrap();
     let file_path = dir.path().join("test_file_ssd.txt");
-    
+
     // Create test file
     let mut file = File::create(&file_path).unwrap();
     file.write_all(b"SSD test data").unwrap();
     drop(file);
 
     // Configure for SSD with TRIM support
-    let wiper = SecureWipe::new(
+    let wiper = Shredder::new(
         WipeStandard::Modern(Nist80088Config {
             method: SanitizationMethod::Purge,
             verify_level: VerificationLevel::Enhanced,
@@ -94,7 +96,7 @@ fn test_ssd_specific_deletion() {
             supports_secure_erase: true,
             supports_nvme_sanitize: true,
             has_wear_leveling: true,
-        })
+        }),
     );
 
     // Perform deletion
@@ -108,14 +110,14 @@ fn test_ssd_specific_deletion() {
 fn test_flash_wear_leveling_handling() {
     let dir = tempdir().unwrap();
     let file_path = dir.path().join("test_file_flash.txt");
-    
+
     // Create test file
     let mut file = File::create(&file_path).unwrap();
     file.write_all(b"Flash drive test data").unwrap();
     drop(file);
 
     // Configure for Flash storage with wear leveling
-    let wiper = SecureWipe::new(
+    let wiper = Shredder::new(
         WipeStandard::Modern(Nist80088Config {
             method: SanitizationMethod::Clear,
             verify_level: VerificationLevel::Full,
@@ -125,7 +127,7 @@ fn test_flash_wear_leveling_handling() {
             supports_secure_erase: false,
             supports_nvme_sanitize: false,
             has_wear_leveling: true,
-        })
+        }),
     );
 
     // Perform deletion
@@ -140,7 +142,7 @@ fn test_error_handling() {
     let dir = tempdir().unwrap();
     let nonexistent_path = dir.path().join("nonexistent.txt");
 
-    let wiper = SecureWipe::new(
+    let wiper = Shredder::new(
         WipeStandard::Modern(Nist80088Config {
             method: SanitizationMethod::Clear,
             verify_level: VerificationLevel::Basic,
@@ -150,7 +152,7 @@ fn test_error_handling() {
             supports_secure_erase: false,
             supports_nvme_sanitize: false,
             has_wear_leveling: false,
-        })
+        }),
     );
 
     // Attempt to wipe non-existent file

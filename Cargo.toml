@@ -1,12 +1,19 @@
 [package]
-name = "secure-wipe"
+name = "shredder"
 version = "0.1.0"
 authors = ["alake <g4titan1@gmail.com>"]
 edition = "2021"
+description = "A secure file deletion tool that says Auf Wiedersen to your files"
+license = "MIT"
+readme = "README.md"
+keywords = ["security", "file-deletion", "secure-delete", "shred"]
+categories = ["command-line-utilities", "filesystem"]
 
 [dependencies]
 env_logger = "0.11.6"
 error = "0.1.9"
+libc = "0.2.169"
 log = "0.4.22"
 rand = "0.8.5"
+tempfile = "3.15.0"
 thiserror = "2.0.9"
