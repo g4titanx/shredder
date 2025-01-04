@@ -65,6 +65,8 @@ pub struct WipeConfig {
     pub verify_each_pass: bool,
 }
 
+
+
 /// levels of verification after wiping
 #[derive(Debug, Clone)]
 pub enum VerificationLevel {
