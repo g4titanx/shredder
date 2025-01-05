@@ -6,32 +6,42 @@ use shredder::{
     storage::{StorageType, StorageInfo, StorageCapabilities},
     standards::{WipeStandard, Nist80088Config, SanitizationMethod, VerificationLevel},
 };
-use clap::{CommandFactory, Parser, Subcommand};
+use clap::Parser;
 
-/// A secure file deletion tool that says Auf Wiedersen to your files
+/// a secure file deletion tool that says Auf Wiedersen to your files
 #[derive(Parser)]
 #[command(name = "shred")]
 #[command(author = "alake <g4titan1@gmail.com>")]
 #[command(version)]
-#[command(about = "Securely erases files and storage devices", long_about = None)]
+#[command(about = "A secure file deletion tool that says Auf Wiedersen to your files")]
+#[command(long_about = "Securely erases files and devices using various military-grade standards including NIST 800-88, DoD 5220.22-M, and more.")]
 struct Cli {
     /// path to file or device to securely erase
+    #[arg(help = "Path to file or device to securely erase")]
     path: PathBuf,
 
-    /// wiping standard to use (nist, dod, gutmann, vsitr)
-    #[arg(short, long, default_value = "nist")]
+    /// wiping standard to use
+    #[arg(short, long, default_value = "nist", 
+          help = "Wiping standard to use (nist, dod, gutmann, vsitr)",
+          long_help = "Available standards:\n  nist - NIST 800-88 (default, recommended)\n  dod - DoD 5220.22-M (3 passes)\n  gutmann - Gutmann 35-pass method\n  vsitr - German VSITR 7-pass standard")]
     standard: String,
 
-    /// verification level (none, basic, full, enhanced)
-    #[arg(short, long, default_value = "full")]
+    /// verification level
+    #[arg(short, long, default_value = "full",
+          help = "Verification level (none, basic, full, enhanced)",
+          long_help = "Verification levels:\n  none - No verification\n  basic - Sample verification\n  full - Complete verification (default)\n  enhanced - Multiple verification passes")]
     verify: String,
 
     /// force operation without confirmation
-    #[arg(short, long)]
+    #[arg(short, long,
+          help = "Force operation without confirmation",
+          long_help = "Skip the 'Auf Wiedersen' confirmation prompt. Use with caution!")]
     force: bool,
 
-    /// skip root/admin check (use with caution)
-    #[arg(long)]
+    /// skip root/admin check
+    #[arg(long,
+          help = "Skip root/admin check (use with caution)",
+          long_help = "Skip the root/administrator privilege check. Note: Operations may fail without proper privileges.")]
     no_root_check: bool,
 }
 

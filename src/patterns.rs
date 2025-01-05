@@ -23,14 +23,16 @@ pub enum WipePattern {
 impl WipePattern {
     /// fills a buffer with the specified pattern
     ///
-    /// # arguments
+    /// # Arguments
     /// * `buffer` - mutable slice to fill with the pattern
     ///
-    /// # examples
+    /// # Examples
     /// ```
+    /// use shredder::patterns::WipePattern;
+    /// 
     /// let mut buffer = vec![0; 1024];
     /// WipePattern::Zeros.fill_buffer(&mut buffer);
-    /// // buffer is now filled with 0x00
+    /// assert!(buffer.iter().all(|&b| b == 0x00));
     /// ```
     pub fn fill_buffer(&self, buffer: &mut [u8]) {
         match self {
@@ -61,6 +63,8 @@ impl WipePattern {
     ///
     /// # examples
     /// ```
+    /// use shredder::patterns::WipePattern;
+    /// 
     /// let mut buffer = vec![0x00; 1024];
     /// assert!(WipePattern::Zeros.verify_buffer(&buffer));
     /// ```

@@ -1,4 +1,4 @@
-# shredder
+# shredder (PoC)
 shredder is a secure file deletion tool
 
 ⚠️ **Warning**: not ready for use

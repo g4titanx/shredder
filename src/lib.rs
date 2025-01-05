@@ -237,20 +237,47 @@ impl Shredder {
     fn overwrite_file_contents(
         &self,
         file: &mut File,
-        buffer: &[u8],
+        pattern: &[u8],
         file_size: u64,
     ) -> Result<()> {
+        // Create a buffer sized according to our buffer_size setting
+        let mut write_buffer = vec![0u8; self.buffer_size];
+        
         file.seek(SeekFrom::Start(0))?;
         let mut written = 0u64;
 
         while written < file_size {
+            // Fill write buffer with pattern
+            for chunk in write_buffer.chunks_mut(pattern.len()) {
+                let len = std::cmp::min(chunk.len(), pattern.len());
+                chunk[..len].copy_from_slice(&pattern[..len]);
+            }
+
             let remaining = file_size - written;
-            let write_size = std::cmp::min(remaining as usize, buffer.len());
-            file.write_all(&buffer[..write_size])?;
+            let write_size = std::cmp::min(remaining as usize, write_buffer.len());
+
+            // Write and verify immediately
+            file.write_all(&write_buffer[..write_size])?;
+            file.flush()?;
+
+            // Verify this chunk
+            file.seek(SeekFrom::Start(written))?;
+            let mut verify_buffer = vec![0u8; write_size];
+            file.read_exact(&mut verify_buffer)?;
+
+            if verify_buffer != write_buffer[..write_size] {
+                return Err(WipeError::VerificationFailed(
+                    format!("Immediate verification failed at offset {}", written)
+                ));
+            }
+
             written += write_size as u64;
         }
 
+        // Final flush and sync to ensure all writes are on disk
         file.flush()?;
+        file.sync_all()?;
+        
         Ok(())
     }
 
@@ -310,11 +337,21 @@ impl Shredder {
             VerificationLevel::Basic => {
                 // sample ~1% of file at random locations
                 let file_size = file.metadata()?.len();
+                if file_size == 0 {
+                    return Ok(());  // Empty file is considered verified
+                }
+                
                 let mut verify_buf = vec![0u8; expected_pattern.len()];
-                let samples = (file_size / 100) as usize;
+                let samples = std::cmp::max((file_size / 100) as usize, 1); // At least 1 sample
 
                 for _ in 0..samples {
-                    let offset = rand::random::<u64>() % (file_size - expected_pattern.len() as u64);
+                    // ensure we don't exceed file size - pattern length
+                    let max_offset = file_size.saturating_sub(expected_pattern.len() as u64);
+                    if max_offset == 0 {
+                        break;  // File is too small for pattern verification
+                    }
+                    
+                    let offset = rand::random::<u64>() % max_offset;
                     file.seek(SeekFrom::Start(offset))?;
                     file.read_exact(&mut verify_buf)?;
 
@@ -330,6 +367,10 @@ impl Shredder {
                 // verify entire file
                 file.seek(SeekFrom::Start(0))?;
                 let mut verify_buf = vec![0u8; expected_pattern.len()];
+                
+                if file.metadata()?.len() == 0 {
+                    return Ok(());  // empty file is considered verified
+                }
                 
                 loop {
                     match file.read_exact(&mut verify_buf) {
@@ -348,7 +389,7 @@ impl Shredder {
             }
         }
     }
-
+    
     /// attempts to perform hardware-based secure erase
     fn perform_hardware_secure_erase<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         secure_erase::perform_secure_erase(path.as_ref())
@@ -369,5 +410,25 @@ impl Shredder {
             }
         }
         Ok(())
+    }
+    
+    /// sets the buffer size for I/O operations
+    ///
+    /// # Arguments
+    /// * `size` - The new buffer size in bytes (minimum 4KB, maximum 16MB)
+    ///
+    /// # Returns
+    /// the shredder instance for method chaining
+    pub fn with_buffer_size(mut self, size: usize) -> Self {
+        const MIN_BUFFER: usize = 4 * 1024;        // 4KB
+        const MAX_BUFFER: usize = 16 * 1024 * 1024; // 16MB
+        
+        self.buffer_size = size.clamp(MIN_BUFFER, MAX_BUFFER);
+        self
+    }
+
+    /// gets the current buffer size
+    pub fn get_buffer_size(&self) -> usize {
+        self.buffer_size
     }
 }
