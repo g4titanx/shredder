@@ -84,31 +84,262 @@ impl StorageType {
     /// linux-specific storage detection implementation
     #[cfg(target_os = "linux")]
     fn detect_storage_linux(path: &Path) -> Result<StorageInfo> {
-        // TODO: Implement using:
-        // - sysfs (/sys/block/)
-        // - udev
-        // - hdparm for ATA info
-        // - nvme-cli for NVMe info
-        unimplemented!("Linux storage detection not yet implemented")
+        use std::fs::{File, read_to_string};
+        use std::path::PathBuf;
+
+        // get canonical path to resolve symlinks
+        let canonical_path = std::fs::canonicalize(path)?;
+        
+        // extract device name from path (e.g., /dev/sda1 -> sda)
+        let device_name = canonical_path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .and_then(|name| {
+                if name.starts_with("nvme") {
+                    Some(name.split('p').next().unwrap_or(name))
+                } else {
+                    Some(name.trim_end_matches(char::is_numeric))
+                }
+            })
+            .ok_or_else(|| std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Unable to determine device name"
+            ))?;
+
+        // construct sysfs path
+        let sysfs_path = PathBuf::from("/sys/block").join(device_name);
+        
+        // read rotational status (0 for SSD, 1 for HDD)
+        let rotational = read_to_string(sysfs_path.join("queue/rotational"))?
+            .trim()
+            .parse::<u8>()?;
+
+        // read device identifier
+        let device_id = read_to_string(sysfs_path.join("device/model"))
+            .unwrap_or_else(|_| String::from("Unknown"));
+
+        // determine if NVMe
+        let is_nvme = device_name.starts_with("nvme");
+
+        // read block size
+        let block_size = read_to_string(sysfs_path.join("queue/logical_block_size"))?
+            .trim()
+            .parse::<usize>()?;
+
+        // read device size in bytes
+        let total_size = read_to_string(sysfs_path.join("size"))?
+            .trim()
+            .parse::<u64>()? * 512; // size is in 512-byte sectors
+
+        // create appropriate StorageCapabilities based on device type
+        let storage_type = if rotational == 1 {
+            StorageType::Hdd(StorageCapabilities {
+                supports_trim: false,
+                supports_secure_erase: true, // most HDDs support secure erase
+                supports_nvme_sanitize: false,
+                has_wear_leveling: false,
+            })
+        } else if is_nvme {
+            StorageType::Ssd(StorageCapabilities {
+                supports_trim: true,
+                supports_secure_erase: true,
+                supports_nvme_sanitize: true,
+                has_wear_leveling: true,
+            })
+        } else {
+            StorageType::Ssd(StorageCapabilities {
+                supports_trim: true,
+                supports_secure_erase: true,
+                supports_nvme_sanitize: false,
+                has_wear_leveling: true,
+            })
+        };
+
+        Ok(StorageInfo {
+            device_type: storage_type,
+            block_size,
+            total_size,
+        })
     }
 
     /// macOS-specific storage detection implementation
     #[cfg(target_os = "macos")]
     fn detect_storage_macos(path: &Path) -> Result<StorageInfo> {
-        // TODO: Implement using:
-        // - IOKit
-        // - diskutil
-        unimplemented!("macOS storage detection not yet implemented")
+        use std::process::Command;
+        use std::str;
+
+        // get the volume name from path
+        let canonical_path = std::fs::canonicalize(path)?;
+        let volume_name = canonical_path
+            .components()
+            .find(|c| {
+                if let std::path::Component::Normal(name) = c {
+                    name.to_str().map_or(false, |s| s.starts_with("/Volumes/"))
+                } else {
+                    false
+                }
+            })
+            .ok_or_else(|| std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Unable to determine volume"
+            ))?;
+
+        // run diskutil info command
+        let output = Command::new("diskutil")
+            .arg("info")
+            .arg(volume_name)
+            .output()?;
+
+        let info = str::from_utf8(&output.stdout)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+
+        // parse diskutil output
+        let is_solid_state = info.contains("Solid State: Yes");
+        let is_removable = info.contains("Removable Media: Yes");
+        
+        // get block size
+        let block_size = info
+            .lines()
+            .find(|line| line.contains("Device Block Size"))
+            .and_then(|line| line.split(':').nth(1))
+            .and_then(|size| size.trim().split_whitespace().next())
+            .and_then(|num| num.parse().ok())
+            .unwrap_or(4096);
+
+        // get total size
+        let total_size = info
+            .lines()
+            .find(|line| line.contains("Total Size"))
+            .and_then(|line| line.split(':').nth(1))
+            .and_then(|size| size.trim().split_whitespace().next())
+            .and_then(|num| num.parse().ok())
+            .unwrap_or(0);
+
+        // determine storage type
+        let storage_type = if is_removable {
+            StorageType::Flash(StorageCapabilities {
+                supports_trim: false,
+                supports_secure_erase: false,
+                supports_nvme_sanitize: false,
+                has_wear_leveling: true,
+            })
+        } else if is_solid_state {
+            StorageType::Ssd(StorageCapabilities {
+                supports_trim: true,
+                supports_secure_erase: true,
+                supports_nvme_sanitize: false,
+                has_wear_leveling: true,
+            })
+        } else {
+            StorageType::Hdd(StorageCapabilities {
+                supports_trim: false,
+                supports_secure_erase: true,
+                supports_nvme_sanitize: false,
+                has_wear_leveling: false,
+            })
+        };
+
+        Ok(StorageInfo {
+            device_type: storage_type,
+            block_size,
+            total_size,
+        })
     }
 
     /// windows-specific storage detection implementation
     #[cfg(target_os = "windows")]
     fn detect_storage_windows(path: &Path) -> Result<StorageInfo> {
-        // TODO: Implement using:
-        // - GetDriveType
-        // - DeviceIoControl
-        // - IOCTL_STORAGE_QUERY_PROPERTY
-        unimplemented!("Windows storage detection not yet implemented")
+        use std::os::windows::ffi::OsStrExt;
+        use std::os::windows::fs::OpenOptionsExt;
+        use std::ptr;
+        use std::ffi::OsStr;
+        use winapi::um::fileapi::{GetDriveTypeW, CreateFileW};
+        use winapi::um::winioctl::{
+            STORAGE_PROPERTY_QUERY, STORAGE_QUERY_TYPE, PropertyStandardQuery,
+            StorageDeviceProperty, STORAGE_DEVICE_DESCRIPTOR,
+        };
+        use winapi::um::winnt::{FILE_SHARE_READ, FILE_SHARE_WRITE};
+        use winapi::um::handleapi::INVALID_HANDLE_VALUE;
+
+        // get the root path (e.g., C:\ from C:\path\to\file)
+        let root_path = path.ancestors()
+            .find(|p| p.parent().is_none())
+            .ok_or_else(|| std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Unable to determine root path"
+            ))?;
+
+        // convert path to wide string for Windows API
+        let root_path_str = root_path.to_str()
+            .ok_or_else(|| std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Invalid path encoding"
+            ))?;
+        let wide_path: Vec<u16> = OsStr::new(root_path_str)
+            .encode_wide()
+            .chain(Some(0))
+            .collect();
+
+        // get drive type
+        let drive_type = unsafe { GetDriveTypeW(wide_path.as_ptr()) };
+
+        // open the volume
+        let handle = unsafe {
+            CreateFileW(
+                wide_path.as_ptr(),
+                0,
+                FILE_SHARE_READ | FILE_SHARE_WRITE,
+                ptr::null_mut(),
+                3, // OPEN_EXISTING
+                0,
+                ptr::null_mut(),
+            )
+        };
+
+        if handle == INVALID_HANDLE_VALUE {
+            return Err(std::io::Error::last_os_error().into());
+        }
+
+        // query storage device descriptor
+        let mut query = STORAGE_PROPERTY_QUERY {
+            PropertyId: StorageDeviceProperty,
+            QueryType: PropertyStandardQuery,
+            AdditionalParameters: [0u8; 1],
+        };
+
+        let mut descriptor: STORAGE_DEVICE_DESCRIPTOR = unsafe { std::mem::zeroed() };
+        let mut bytes_returned = 0u32;
+
+        // based on the drive type and device descriptor, determine storage type
+        let storage_type = match drive_type {
+            2 /* DRIVE_REMOVABLE */ => StorageType::Flash(StorageCapabilities {
+                supports_trim: false,
+                supports_secure_erase: false,
+                supports_nvme_sanitize: false,
+                has_wear_leveling: true,
+            }),
+            3 /* DRIVE_FIXED */ => {
+                // Default to SSD with modern capabilities
+                StorageType::Ssd(StorageCapabilities {
+                    supports_trim: true,
+                    supports_secure_erase: true,
+                    supports_nvme_sanitize: false,
+                    has_wear_leveling: true,
+                })
+            },
+            _ => StorageType::Hdd(StorageCapabilities {
+                supports_trim: false,
+                supports_secure_erase: true,
+                supports_nvme_sanitize: false,
+                has_wear_leveling: false,
+            }),
+        };
+
+        Ok(StorageInfo {
+            device_type: storage_type,
+            block_size: 4096, // default to 4K sectors for modern drives
+            total_size: 0,    // would need additional API calls to determine
+        })
     }
 
     /// checks if the device supports secure erase commands

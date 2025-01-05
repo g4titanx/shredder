@@ -10,6 +10,7 @@ keywords = ["security", "file-deletion", "secure-delete", "shred"]
 categories = ["command-line-utilities", "filesystem"]
 
 [dependencies]
+clap = { version = "4.5.23", features = ["derive", "cargo"] }
 env_logger = "0.11.6"
 error = "0.1.9"
 libc = "0.2.169"
@@ -17,3 +18,15 @@ log = "0.4.22"
 rand = "0.8.5"
 tempfile = "3.15.0"
 thiserror = "2.0.9"
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3.9", features = [
+    "fileapi",
+    "handleapi",
+    "ioapiset",
+    "winioctl",
+    "winnt",
+    "errhandlingapi",
+    "winbase"
+]}
+scopeguard = "1.2.0"
