@@ -1,6 +1,8 @@
 # shredder
 shredder is a secure file deletion tool
 
+⚠️ **Warning**: not ready for use
+
 ## features
 - Multiple secure deletion standards (NIST 800-88, DoD 5220.22-M, Gutmann, VSITR)
 - Storage-aware operation (HDD, SSD, Flash)
