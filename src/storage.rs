@@ -84,13 +84,13 @@ impl StorageType {
     /// linux-specific storage detection implementation
     #[cfg(target_os = "linux")]
     fn detect_storage_linux(path: &Path) -> Result<StorageInfo> {
-        use std::fs::{File, read_to_string};
+        use std::fs::read_to_string;
         use std::path::PathBuf;
 
-        // get canonical path to resolve symlinks
+        // Get canonical path to resolve symlinks
         let canonical_path = std::fs::canonicalize(path)?;
         
-        // extract device name from path (e.g., /dev/sda1 -> sda)
+        // Extract device name from path (e.g., /dev/sda1 -> sda)
         let device_name = canonical_path
             .file_name()
             .and_then(|name| name.to_str())
@@ -106,36 +106,33 @@ impl StorageType {
                 "Unable to determine device name"
             ))?;
 
-        // construct sysfs path
+        // Construct sysfs path
         let sysfs_path = PathBuf::from("/sys/block").join(device_name);
         
-        // read rotational status (0 for SSD, 1 for HDD)
-        let rotational = read_to_string(sysfs_path.join("queue/rotational"))?
-            .trim()
-            .parse::<u8>()?;
+        // Read rotational status (0 for SSD, 1 for HDD)
+        let rotational_str = read_to_string(sysfs_path.join("queue/rotational"))?;
+        let rotational = rotational_str.trim().parse::<u8>()?;
 
-        // read device identifier
+        // Read device identifier
         let device_id = read_to_string(sysfs_path.join("device/model"))
             .unwrap_or_else(|_| String::from("Unknown"));
 
-        // determine if NVMe
+        // Determine if NVMe
         let is_nvme = device_name.starts_with("nvme");
 
-        // read block size
-        let block_size = read_to_string(sysfs_path.join("queue/logical_block_size"))?
-            .trim()
-            .parse::<usize>()?;
+        // Read block size
+        let block_size_str = read_to_string(sysfs_path.join("queue/logical_block_size"))?;
+        let block_size = block_size_str.trim().parse::<usize>()?;
 
-        // read device size in bytes
-        let total_size = read_to_string(sysfs_path.join("size"))?
-            .trim()
-            .parse::<u64>()? * 512; // size is in 512-byte sectors
+        // Read device size in bytes
+        let size_str = read_to_string(sysfs_path.join("size"))?;
+        let total_size = size_str.trim().parse::<u64>()? * 512; // size is in 512-byte sectors
 
-        // create appropriate StorageCapabilities based on device type
+        // Create appropriate StorageCapabilities based on device type
         let storage_type = if rotational == 1 {
             StorageType::Hdd(StorageCapabilities {
                 supports_trim: false,
-                supports_secure_erase: true, // most HDDs support secure erase
+                supports_secure_erase: true,
                 supports_nvme_sanitize: false,
                 has_wear_leveling: false,
             })

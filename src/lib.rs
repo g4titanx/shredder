@@ -27,6 +27,10 @@ pub enum WipeError {
     /// indicates when an operation isn't supported (e.g., on certain platforms)
     #[error("Unsupported operation: {0}")]
     UnsupportedOperation(String),
+
+    /// parsing error for numeric values
+    #[error("Parse error: {0}")]
+    Parse(#[from] std::num::ParseIntError),
 }
 
 /// type alias for Result with our custom WipeError

@@ -4,17 +4,17 @@ use std::path::Path;
 #[cfg(target_os = "linux")]
 pub fn perform_secure_erase(path: &Path) -> Result<()> {
     use std::process::Command;
-    use std::fs::read_to_string;
+    use std::fs::read_to_string;  // Add this import
     use std::os::unix::fs::MetadataExt;
 
-    // check for root privileges
+    // Check for root privileges
     if unsafe { libc::geteuid() } != 0 {
         return Err(crate::WipeError::UnsupportedOperation(
             "Root privileges required for secure erase operations".into()
         ));
     }
 
-    // check if it's a system disk
+    // Check if it's a system disk
     let is_system = is_linux_system_disk(path)?;
     if is_system {
         return Err(crate::WipeError::UnsupportedOperation(
@@ -22,11 +22,15 @@ pub fn perform_secure_erase(path: &Path) -> Result<()> {
         ));
     }
 
-    // get device information
+    // Get device information
     let device_info = get_linux_device_info(path)?;
     log::info!("Detected device: {}", device_info);
 
-    // attempt NVME sanitize if applicable
+    // Get device information
+    let device_info = get_linux_device_info(path)?;
+    log::info!("Detected device: {}", device_info);
+
+    // Attempt NVME sanitize if applicable
     if device_info.contains("NVMe") {
         log::info!("Attempting NVMe sanitize...");
         let nvme_result = Command::new("nvme")
@@ -40,7 +44,7 @@ pub fn perform_secure_erase(path: &Path) -> Result<()> {
         }
     }
 
-    // fallback to hdparm
+    // Fallback to hdparm
     log::info!("Attempting ATA secure erase via hdparm...");
     let output = Command::new("hdparm")
         .args(["--security-erase", path.to_str().unwrap()])
