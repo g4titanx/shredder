@@ -9,6 +9,11 @@ readme = "README.md"
 keywords = ["security", "file-deletion", "secure-delete", "shred"]
 categories = ["command-line-utilities", "filesystem"]
 
+
+[[bin]]
+name = "shred"
+path = "src/main.rs"
+
 [dependencies]
 clap = { version = "4.5.23", features = ["derive", "cargo"] }
 env_logger = "0.11.6"

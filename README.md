@@ -2,32 +2,58 @@
 shredder is a secure file deletion tool
 
 ## features
-- Multiple secure deletion standards (NIST 800-88, DoD 5220.22-M, Gutmann, VSITR)
-- Storage-aware operation (HDD, SSD, Flash)
-- Hardware-based secure erase when available
-- Multiple verification levels
-- Cross-platform support (Linux, Windows, macOS)
+- multiple secure deletion standards (NIST 800-88, DoD 5220.22-M, Gutmann, VSITR)
+- storage-aware operation (HDD, SSD, Flash)
+- hardware-based secure erase when available
+- multiple verification levels
+- cross-platform support (Linux, Windows, macOS)
 
-## usage
+## security standards
+- **NIST** (default): NIST 800-88 compliant, modern approach
+- **DoD**: DoD 5220.22-M standard (3 passes)
+- **Gutmann**: Peter Gutmann's 35-pass method
+- **VSITR**: German VSITR 7-pass standard
+
+## installation
+
+### from source
 ```bash
-# install cargo using `https://rustup.rs/`
-cargo install shredder
-
-# Or build from source
-
-git clone https://github.com/g4titanx/shredder
+# clone the repository
+git clone https://github.com/yourusername/shred
 cd shred
-cargo build --release
-```
-shred {path_to_file}
-(enter password and say `Auf Wiedersen` to your file`)
 
+# build and install
+cargo build --release     # just build
+cargo install --path .    # install to ~/.cargo/bin/shred
+```
+
+### running with different installation methods
+
+1. if installed via `cargo install`:
+```bash
+sudo shred file.txt             # If ~/.cargo/bin is in PATH
+sudo ~/.cargo/bin/shred file.txt # Full path
+```
+
+2. running from the repository:
+```bash
+sudo ./target/release/shred file.txt
+```
 
 ## usage
 
-### basic command
 ```bash
-shred 
+# basic usage
+sudo shred file.txt
+
+# using DoD standard
+sudo shred --standard dod file.txt
+
+# enhanced verification
+sudo shred --verify enhanced file.txt
+
+# force deletion without confirmation
+sudo shred --force file.txt
 ```
 
 ### options
@@ -35,12 +61,12 @@ shred
 shred [OPTIONS] 
 
 Options:
-  -s, --standard     wiping standard to use [default: nist] [possible values: nist, dod, gutmann, vsitr]
-  -v, --verify         verification level [default: full] [possible values: none, basic, full, enhanced]
-  -f, --force                 force operation without confirmation
-      --no-root-check        skip root/admin check (use with caution)
-  -h, --help                 print help
-  -V, --version              print version
+  -s, --standard            wiping standard to use [default: nist] [possible values: nist, dod, gutmann, vsitr]
+  -v, --verify              verification level [default: full] [possible values: none, basic, full, enhanced]
+  -f, --force               force operation without confirmation
+      --no-root-check       skip root/admin check (use with caution)
+  -h, --help                print help
+  -V, --version             print version
 ```
 
 ### important notes
@@ -53,8 +79,14 @@ using `sudo` with `--no-root-check` is redundant as the privilege check will pas
 
 ⚠️ **Warning**: Operations might fail when run without proper privileges
 
-### Security Standards
-- **NIST** (default): NIST 800-88 compliant, modern approach
-- **DoD**: DoD 5220.22-M standard (3 passes)
-- **Gutmann**: Peter Gutmann's 35-pass method
-- **VSITR**: German VSITR 7-pass standard
+## TODO
+
+### planned Features
+1. directory Support
+   - [ ] Recursive directory wiping and directory traversal options
+   - [ ] Configurable file inclusion/exclusion patterns
+
+2. enhanced progress reporting
+   - [ ] Progress tracking for multiple files
+   - [ ] ETA calculation
+   - [ ] Detailed operation statistics

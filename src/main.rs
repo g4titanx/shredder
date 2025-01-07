@@ -123,6 +123,17 @@ fn main() {
     
     // parse command line arguments
     let cli = Cli::parse();
+    
+    // validate path and check if it's a file
+    if !cli.path.exists() {
+        eprintln!("Error: Path not found: {}", cli.path.display());
+        process::exit(1);
+    }
+    
+    if cli.path.is_dir() {
+        eprintln!("Error: {} is a directory. This tool only works with files.", cli.path.display());
+        process::exit(1);
+    }
 
     // check for root/admin privileges if not explicitly skipped
     if !cli.no_root_check && !check_privileges() {
