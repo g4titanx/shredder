@@ -1,17 +1,17 @@
-pub mod patterns;     // contains wiping patterns (Zeros, Ones, Random)
-pub mod standards;    // contains wiping standards (DoD, NIST, etc.)
-pub mod storage;      // storage device type detection and handling
+pub mod patterns; // contains wiping patterns (Zeros, Ones, Random)
 mod secure_erase;
+pub mod standards; // contains wiping standards (DoD, NIST, etc.)
+pub mod storage; // storage device type detection and handling
 mod trim;
 
+use log::{debug, info, warn};
 use patterns::WipePattern;
-use standards::{WipeStandard, SanitizationMethod, VerificationLevel};
+use standards::{SanitizationMethod, VerificationLevel, WipeStandard};
 use std::fs::{File, OpenOptions};
 use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 use storage::StorageType;
 use thiserror::Error;
-use log::{debug, info, warn};
 
 /// represents various errors that can occur during secure deletion
 #[derive(Error, Debug)]
@@ -81,16 +81,13 @@ impl Shredder {
     fn perform_modern_wipe<P: AsRef<Path>>(
         &self,
         path: P,
-        config: &standards::Nist80088Config
+        config: &standards::Nist80088Config,
     ) -> Result<()> {
         let path = path.as_ref();
         info!("Starting modern wipe for: {}", path.display());
 
         // open file with write permissions
-        let mut file = OpenOptions::new()
-            .write(true)
-            .read(true)
-            .open(path)?;
+        let mut file = OpenOptions::new().write(true).read(true).open(path)?;
 
         // Get file size for verification
         let file_size = file.metadata()?.len();
@@ -112,13 +109,16 @@ impl Shredder {
                 debug!("Performing Clear operation with random data");
                 WipePattern::Random.fill_buffer(&mut buffer);
                 self.overwrite_file_contents(&mut file, &buffer, file_size)?;
-            },
+            }
             SanitizationMethod::Purge => {
                 // for Purge, try hardware-based secure erase first
                 if self.storage_type.supports_secure_erase() {
                     debug!("Attempting hardware-based secure erase");
                     if let Err(e) = self.perform_hardware_secure_erase(path) {
-                        warn!("Hardware secure erase failed: {}, falling back to software method", e);
+                        warn!(
+                            "Hardware secure erase failed: {}, falling back to software method",
+                            e
+                        );
                         self.perform_purge_overwrite(&mut file, &mut buffer, file_size)?;
                     }
                 } else {
@@ -130,7 +130,10 @@ impl Shredder {
 
         // verify wiping if required
         if config.verify_level != VerificationLevel::None {
-            debug!("Performing verification at level: {:?}", config.verify_level);
+            debug!(
+                "Performing verification at level: {:?}",
+                config.verify_level
+            );
             self.verify_wiping(&mut file, &buffer, config.verify_level)?;
         }
 
@@ -152,7 +155,7 @@ impl Shredder {
     fn perform_legacy_wipe<P: AsRef<Path>>(
         &self,
         path: P,
-        config: &standards::LegacyConfig
+        config: &standards::LegacyConfig,
     ) -> Result<()> {
         let path = path.as_ref();
         info!("Starting legacy wipe using standard: {:?}", config.standard);
@@ -162,10 +165,7 @@ impl Shredder {
         debug!("Using {} pass wiping pattern", patterns.len());
 
         // open file with write permissions
-        let mut file = OpenOptions::new()
-            .write(true)
-            .read(true)
-            .open(path)?;
+        let mut file = OpenOptions::new().write(true).read(true).open(path)?;
 
         let file_size = file.metadata()?.len();
         let buffer_size = self.calculate_optimal_buffer_size(file_size);
@@ -203,15 +203,12 @@ impl Shredder {
     fn perform_custom_wipe<P: AsRef<Path>>(
         &self,
         path: P,
-        config: &standards::WipeConfig
+        config: &standards::WipeConfig,
     ) -> Result<()> {
         let path = path.as_ref();
         info!("Starting custom wipe with {} passes", config.passes.len());
 
-        let mut file = OpenOptions::new()
-            .write(true)
-            .read(true)
-            .open(path)?;
+        let mut file = OpenOptions::new().write(true).read(true).open(path)?;
 
         let file_size = file.metadata()?.len();
         let buffer_size = self.calculate_optimal_buffer_size(file_size);
@@ -246,7 +243,7 @@ impl Shredder {
     ) -> Result<()> {
         // Create a buffer sized according to our buffer_size setting
         let mut write_buffer = vec![0u8; self.buffer_size];
-        
+
         file.seek(SeekFrom::Start(0))?;
         let mut written = 0u64;
 
@@ -270,9 +267,10 @@ impl Shredder {
             file.read_exact(&mut verify_buffer)?;
 
             if verify_buffer != write_buffer[..write_size] {
-                return Err(WipeError::VerificationFailed(
-                    format!("Immediate verification failed at offset {}", written)
-                ));
+                return Err(WipeError::VerificationFailed(format!(
+                    "Immediate verification failed at offset {}",
+                    written
+                )));
             }
 
             written += write_size as u64;
@@ -281,7 +279,7 @@ impl Shredder {
         // Final flush and sync to ensure all writes are on disk
         file.flush()?;
         file.sync_all()?;
-        
+
         Ok(())
     }
 
@@ -290,14 +288,14 @@ impl Shredder {
         &self,
         file: &mut File,
         buffer: &mut [u8],
-        file_size: u64
+        file_size: u64,
     ) -> Result<()> {
         // multiple passes for Purge method
         let patterns = [
-            WipePattern::Random,    // random data pass
-            WipePattern::Zeros,     // zero pass
-            WipePattern::Ones,      // ones pass
-            WipePattern::Random,    // final random pass
+            WipePattern::Random, // random data pass
+            WipePattern::Zeros,  // zero pass
+            WipePattern::Ones,   // ones pass
+            WipePattern::Random, // final random pass
         ];
 
         for (i, pattern) in patterns.iter().enumerate() {
@@ -312,8 +310,8 @@ impl Shredder {
     /// calculates optimal buffer size based on file size and system memory
     fn calculate_optimal_buffer_size(&self, file_size: u64) -> usize {
         let max_buffer = 8 * 1024 * 1024; // 8MB max
-        let min_buffer = 4 * 1024;        // 4KB min (typical page size)
-        
+        let min_buffer = 4 * 1024; // 4KB min (typical page size)
+
         // use smaller buffer for small files
         if file_size < min_buffer as u64 {
             return file_size as usize;
@@ -324,8 +322,8 @@ impl Shredder {
             max_buffer,
             std::cmp::max(
                 min_buffer,
-                (file_size / 100) as usize // Use ~1% of file size
-            )
+                (file_size / 100) as usize, // Use ~1% of file size
+            ),
         )
     }
 
@@ -334,7 +332,7 @@ impl Shredder {
         &self,
         file: &mut File,
         expected_pattern: &[u8],
-        level: VerificationLevel
+        level: VerificationLevel,
     ) -> Result<()> {
         match level {
             VerificationLevel::None => Ok(()),
@@ -342,9 +340,9 @@ impl Shredder {
                 // sample ~1% of file at random locations
                 let file_size = file.metadata()?.len();
                 if file_size == 0 {
-                    return Ok(());  // Empty file is considered verified
+                    return Ok(()); // Empty file is considered verified
                 }
-                
+
                 let mut verify_buf = vec![0u8; expected_pattern.len()];
                 let samples = std::cmp::max((file_size / 100) as usize, 1); // At least 1 sample
 
@@ -352,39 +350,40 @@ impl Shredder {
                     // ensure we don't exceed file size - pattern length
                     let max_offset = file_size.saturating_sub(expected_pattern.len() as u64);
                     if max_offset == 0 {
-                        break;  // File is too small for pattern verification
+                        break; // File is too small for pattern verification
                     }
-                    
+
                     let offset = rand::random::<u64>() % max_offset;
                     file.seek(SeekFrom::Start(offset))?;
                     file.read_exact(&mut verify_buf)?;
 
                     if verify_buf != expected_pattern {
-                        return Err(WipeError::VerificationFailed(
-                            format!("Pattern mismatch at offset {}", offset)
-                        ));
+                        return Err(WipeError::VerificationFailed(format!(
+                            "Pattern mismatch at offset {}",
+                            offset
+                        )));
                     }
                 }
                 Ok(())
-            },
+            }
             VerificationLevel::Full | VerificationLevel::Enhanced => {
                 // verify entire file
                 file.seek(SeekFrom::Start(0))?;
                 let mut verify_buf = vec![0u8; expected_pattern.len()];
-                
+
                 if file.metadata()?.len() == 0 {
-                    return Ok(());  // empty file is considered verified
+                    return Ok(()); // empty file is considered verified
                 }
-                
+
                 loop {
                     match file.read_exact(&mut verify_buf) {
                         Ok(_) => {
                             if verify_buf != expected_pattern {
                                 return Err(WipeError::VerificationFailed(
-                                    "Pattern mismatch during full verification".into()
+                                    "Pattern mismatch during full verification".into(),
                                 ));
                             }
-                        },
+                        }
                         Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => break,
                         Err(e) => return Err(e.into()),
                     }
@@ -393,7 +392,7 @@ impl Shredder {
             }
         }
     }
-    
+
     /// attempts to perform hardware-based secure erase
     fn perform_hardware_secure_erase<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         secure_erase::perform_secure_erase(path.as_ref())
@@ -415,7 +414,7 @@ impl Shredder {
         }
         Ok(())
     }
-    
+
     /// sets the buffer size for I/O operations
     ///
     /// # Arguments
@@ -424,9 +423,9 @@ impl Shredder {
     /// # Returns
     /// the shredder instance for method chaining
     pub fn with_buffer_size(mut self, size: usize) -> Self {
-        const MIN_BUFFER: usize = 4 * 1024;        // 4KB
+        const MIN_BUFFER: usize = 4 * 1024; // 4KB
         const MAX_BUFFER: usize = 16 * 1024 * 1024; // 16MB
-        
+
         self.buffer_size = size.clamp(MIN_BUFFER, MAX_BUFFER);
         self
     }

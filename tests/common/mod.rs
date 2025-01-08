@@ -1,8 +1,8 @@
+use rand::{thread_rng, RngCore};
 use std::fs::{self, File};
-use std::io::{self, Write, Read};
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use tempfile::{tempdir, TempDir};
-use rand::{thread_rng, RngCore};
 
 /// creates a test file with specific content and size
 pub fn create_test_file(dir: &Path, size: usize) -> io::Result<PathBuf> {
@@ -93,7 +93,7 @@ pub fn create_test_directory() -> io::Result<(TempDir, Vec<PathBuf>)> {
 /// simulates different storage types for testing
 #[cfg(test)]
 pub mod mock_storage {
-    use shredder::storage::{StorageType, StorageCapabilities, StorageInfo};
+    use shredder::storage::{StorageCapabilities, StorageInfo, StorageType};
 
     pub fn mock_hdd() -> StorageInfo {
         StorageInfo {

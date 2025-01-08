@@ -1,14 +1,14 @@
-use std::fs::File;
 use crate::Result;
+use std::fs::File;
 
 #[cfg(target_os = "linux")]
 pub fn perform_trim(file: &mut File) -> Result<()> {
     use std::os::unix::io::AsRawFd;
-    
+
     unsafe {
         // FITRIM ioctl command
         let FITRIM: u64 = 0x40086601;
-        
+
         #[repr(C)]
         struct FtrimRange {
             start: u64,
@@ -34,11 +34,11 @@ pub fn perform_trim(file: &mut File) -> Result<()> {
 #[cfg(target_os = "macos")]
 pub fn perform_trim(file: &mut File) -> Result<()> {
     use std::os::unix::io::AsRawFd;
-    
+
     unsafe {
         // F_FULLFSYNC fcntl command
         const F_FULLFSYNC: i32 = 51;
-        
+
         let result = libc::fcntl(file.as_raw_fd(), F_FULLFSYNC);
         if result == 0 {
             Ok(())
@@ -51,10 +51,10 @@ pub fn perform_trim(file: &mut File) -> Result<()> {
 #[cfg(target_os = "windows")]
 pub fn perform_trim(file: &mut File) -> Result<()> {
     use std::os::windows::io::AsRawHandle;
-    use winapi::um::winioctl::*;
-    use winapi::um::fileapi::DeviceIoControl;
-    use winapi::shared::minwindef::DWORD;
     use std::ptr;
+    use winapi::shared::minwindef::DWORD;
+    use winapi::um::fileapi::DeviceIoControl;
+    use winapi::um::winioctl::*;
 
     #[repr(C)]
     struct DEVICE_MANAGE_DATA_SET_ATTRIBUTES {
@@ -93,8 +93,8 @@ pub fn perform_trim(file: &mut File) -> Result<()> {
     };
 
     // create buffer that contains both structures
-    let total_size = std::mem::size_of::<DEVICE_MANAGE_DATA_SET_ATTRIBUTES>() +
-                     std::mem::size_of::<DEVICE_DATA_SET_RANGE>();
+    let total_size = std::mem::size_of::<DEVICE_MANAGE_DATA_SET_ATTRIBUTES>()
+        + std::mem::size_of::<DEVICE_DATA_SET_RANGE>();
     let mut buffer = vec![0u8; total_size];
 
     // copy structures to buffer
@@ -102,7 +102,9 @@ pub fn perform_trim(file: &mut File) -> Result<()> {
         let attrs_ptr = buffer.as_mut_ptr() as *mut DEVICE_MANAGE_DATA_SET_ATTRIBUTES;
         ptr::write(attrs_ptr, attrs);
 
-        let range_ptr = buffer.as_mut_ptr().add(std::mem::size_of::<DEVICE_MANAGE_DATA_SET_ATTRIBUTES>())
+        let range_ptr = buffer
+            .as_mut_ptr()
+            .add(std::mem::size_of::<DEVICE_MANAGE_DATA_SET_ATTRIBUTES>())
             as *mut DEVICE_DATA_SET_RANGE;
         ptr::write(range_ptr, range);
     }
@@ -118,7 +120,7 @@ pub fn perform_trim(file: &mut File) -> Result<()> {
             ptr::null_mut(),
             0,
             &mut bytes_returned,
-            ptr::null_mut()
+            ptr::null_mut(),
         )
     };
 
@@ -132,6 +134,6 @@ pub fn perform_trim(file: &mut File) -> Result<()> {
 #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
 pub fn perform_trim(_file: &mut File) -> Result<()> {
     Err(crate::WipeError::UnsupportedOperation(
-        "TRIM not supported on this platform".into()
+        "TRIM not supported on this platform".into(),
     ))
 }

@@ -29,7 +29,7 @@ impl WipePattern {
     /// # Examples
     /// ```
     /// use shredder::patterns::WipePattern;
-    /// 
+    ///
     /// let mut buffer = vec![0; 1024];
     /// WipePattern::Zeros.fill_buffer(&mut buffer);
     /// assert!(buffer.iter().all(|&b| b == 0x00));
@@ -64,7 +64,7 @@ impl WipePattern {
     /// # examples
     /// ```
     /// use shredder::patterns::WipePattern;
-    /// 
+    ///
     /// let mut buffer = vec![0x00; 1024];
     /// assert!(WipePattern::Zeros.verify_buffer(&buffer));
     /// ```
@@ -72,17 +72,19 @@ impl WipePattern {
         match self {
             // Check if all bytes are zero
             WipePattern::Zeros => buffer.iter().all(|&b| b == 0x00),
-            
+
             // Check if all bytes are ones
             WipePattern::Ones => buffer.iter().all(|&b| b == 0xFF),
-            
+
             // Random data can't be verified (always returns true)
             WipePattern::Random => true,
-            
+
             // Verify custom pattern repeats correctly
             WipePattern::Custom(pattern) => {
-                buffer.chunks(pattern.len()) // Split buffer into pattern-sized chunks
-                    .all(|chunk| { // Check each chunk
+                buffer
+                    .chunks(pattern.len()) // Split buffer into pattern-sized chunks
+                    .all(|chunk| {
+                        // Check each chunk
                         let len = std::cmp::min(chunk.len(), pattern.len());
                         chunk[..len] == pattern[..len] // Compare chunk with pattern
                     })
@@ -106,8 +108,8 @@ mod tests {
     /// test custom alternating pattern
     #[test]
     fn test_custom_pattern() {
-        let pattern = vec![0x55, 0xAA];  // alternating bits pattern
-        let mut buffer = vec![0; 4];     // buffer for two pattern repetitions
+        let pattern = vec![0x55, 0xAA]; // alternating bits pattern
+        let mut buffer = vec![0; 4]; // buffer for two pattern repetitions
         WipePattern::Custom(pattern).fill_buffer(&mut buffer);
         assert_eq!(buffer, vec![0x55, 0xAA, 0x55, 0xAA]); // verify pattern repeats
     }

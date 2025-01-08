@@ -85,20 +85,20 @@ impl LegacyStandard {
             // DoD 5220.22-M: 3-pass overwrite
             LegacyStandard::Dod522022M => {
                 vec![
-                    WipePattern::Zeros,    // Pass 1: All zeros
-                    WipePattern::Ones,     // Pass 2: All ones
-                    WipePattern::Random,   // Pass 3: Random data
+                    WipePattern::Zeros,  // Pass 1: All zeros
+                    WipePattern::Ones,   // Pass 2: All ones
+                    WipePattern::Random, // Pass 3: Random data
                 ]
             }
             // VSITR: 7-pass overwrite
             LegacyStandard::VsitrStandard => vec![
-                WipePattern::Zeros,    // Pass 1: Zeros
-                WipePattern::Ones,     // Pass 2: Ones
-                WipePattern::Zeros,    // Pass 3: Zeros
-                WipePattern::Ones,     // Pass 4: Ones
-                WipePattern::Zeros,    // Pass 5: Zeros
-                WipePattern::Ones,     // Pass 6: Ones
-                WipePattern::Random,   // Pass 7: Random
+                WipePattern::Zeros,  // Pass 1: Zeros
+                WipePattern::Ones,   // Pass 2: Ones
+                WipePattern::Zeros,  // Pass 3: Zeros
+                WipePattern::Ones,   // Pass 4: Ones
+                WipePattern::Zeros,  // Pass 5: Zeros
+                WipePattern::Ones,   // Pass 6: Ones
+                WipePattern::Random, // Pass 7: Random
             ],
             // Gutmann: 35-pass overwrite
             LegacyStandard::Gutmann => Self::gutmann_patterns(),

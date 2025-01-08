@@ -42,11 +42,11 @@ pub struct StorageCapabilities {
 pub struct StorageInfo {
     /// type of storage device and its capabilities
     pub device_type: StorageType,
-    
+
     /// size of the device's blocks/sectors
     /// typically 512 or 4096 bytes
     pub block_size: usize,
-    
+
     /// total storage capacity in bytes
     pub total_size: u64,
 }
@@ -89,7 +89,7 @@ impl StorageType {
 
         // Get canonical path to resolve symlinks
         let canonical_path = std::fs::canonicalize(path)?;
-        
+
         // Extract device name from path (e.g., /dev/sda1 -> sda)
         let device_name = canonical_path
             .file_name()
@@ -101,14 +101,13 @@ impl StorageType {
                     Some(name.trim_end_matches(char::is_numeric))
                 }
             })
-            .ok_or_else(|| std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Unable to determine device name"
-            ))?;
+            .ok_or_else(|| {
+                std::io::Error::new(std::io::ErrorKind::Other, "Unable to determine device name")
+            })?;
 
         // Construct sysfs path
         let sysfs_path = PathBuf::from("/sys/block").join(device_name);
-        
+
         // Read rotational status (0 for SSD, 1 for HDD)
         let rotational_str = read_to_string(sysfs_path.join("queue/rotational"))?;
         let rotational = rotational_str.trim().parse::<u8>()?;
@@ -176,10 +175,9 @@ impl StorageType {
                     false
                 }
             })
-            .ok_or_else(|| std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Unable to determine volume"
-            ))?;
+            .ok_or_else(|| {
+                std::io::Error::new(std::io::ErrorKind::Other, "Unable to determine volume")
+            })?;
 
         // run diskutil info command
         let output = Command::new("diskutil")
@@ -193,7 +191,7 @@ impl StorageType {
         // parse diskutil output
         let is_solid_state = info.contains("Solid State: Yes");
         let is_removable = info.contains("Removable Media: Yes");
-        
+
         // get block size
         let block_size = info
             .lines()
@@ -246,32 +244,30 @@ impl StorageType {
     /// windows-specific storage detection implementation
     #[cfg(target_os = "windows")]
     fn detect_storage_windows(path: &Path) -> Result<StorageInfo> {
+        use std::ffi::OsStr;
         use std::os::windows::ffi::OsStrExt;
         use std::os::windows::fs::OpenOptionsExt;
         use std::ptr;
-        use std::ffi::OsStr;
-        use winapi::um::fileapi::{GetDriveTypeW, CreateFileW};
+        use winapi::um::fileapi::{CreateFileW, GetDriveTypeW};
+        use winapi::um::handleapi::INVALID_HANDLE_VALUE;
         use winapi::um::winioctl::{
-            STORAGE_PROPERTY_QUERY, STORAGE_QUERY_TYPE, PropertyStandardQuery,
-            StorageDeviceProperty, STORAGE_DEVICE_DESCRIPTOR,
+            PropertyStandardQuery, StorageDeviceProperty, STORAGE_DEVICE_DESCRIPTOR,
+            STORAGE_PROPERTY_QUERY, STORAGE_QUERY_TYPE,
         };
         use winapi::um::winnt::{FILE_SHARE_READ, FILE_SHARE_WRITE};
-        use winapi::um::handleapi::INVALID_HANDLE_VALUE;
 
         // get the root path (e.g., C:\ from C:\path\to\file)
-        let root_path = path.ancestors()
+        let root_path = path
+            .ancestors()
             .find(|p| p.parent().is_none())
-            .ok_or_else(|| std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Unable to determine root path"
-            ))?;
+            .ok_or_else(|| {
+                std::io::Error::new(std::io::ErrorKind::Other, "Unable to determine root path")
+            })?;
 
         // convert path to wide string for Windows API
-        let root_path_str = root_path.to_str()
-            .ok_or_else(|| std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Invalid path encoding"
-            ))?;
+        let root_path_str = root_path.to_str().ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::Other, "Invalid path encoding")
+        })?;
         let wide_path: Vec<u16> = OsStr::new(root_path_str)
             .encode_wide()
             .chain(Some(0))

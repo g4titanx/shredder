@@ -1,13 +1,13 @@
 use shredder::{
-    Shredder,
+    patterns::WipePattern,
     standards::{
         LegacyConfig, LegacyStandard, Nist80088Config, SanitizationMethod, VerificationLevel,
-        WipeStandard, WipeConfig
+        WipeConfig, WipeStandard,
     },
-    patterns::WipePattern,
+    Shredder,
 };
 use std::fs::File;
-use std::io::{Write, Read, Seek, SeekFrom};
+use std::io::{Read, Seek, SeekFrom, Write};
 use tempfile::tempdir;
 
 mod common;
@@ -33,7 +33,7 @@ fn test_basic_file_deletion() {
 #[test]
 fn test_large_file_deletion() {
     let dir = tempdir().unwrap();
-    
+
     // Create a test pattern that's easy to verify
     let pattern = [0xAA, 0x55, 0xAA, 0x55];
     let file_size = 16 * 1024; // 16KB
@@ -56,11 +56,17 @@ fn test_large_file_deletion() {
         let mut file = File::open(&file_path).unwrap();
         let mut buffer = vec![0u8; pattern.len()];
         let mut offset = 0;
-        
+
         while let Ok(n) = file.read(&mut buffer) {
-            if n == 0 { break; }
-            assert_eq!(&buffer[..n], &pattern[..n], 
-                "Initial pattern mismatch at offset {}", offset);
+            if n == 0 {
+                break;
+            }
+            assert_eq!(
+                &buffer[..n],
+                &pattern[..n],
+                "Initial pattern mismatch at offset {}",
+                offset
+            );
             offset += n;
         }
         assert_eq!(offset, file_size, "File size mismatch");
@@ -87,7 +93,7 @@ fn test_large_file_deletion() {
                     );
                 }
             }
-        },
+        }
         Err(e) => {
             let debug_info = if file_path.exists() {
                 let content = std::fs::read(&file_path).unwrap_or_default();
@@ -121,7 +127,7 @@ fn test_dod_standard() {
     match shredder.wipe(&file_path) {
         Ok(()) => {
             assert!(!file_path.exists(), "File should be deleted after wiping");
-        },
+        }
         Err(e) => panic!("Failed to wipe file with DoD standard: {}", e),
     }
 }
@@ -130,7 +136,7 @@ fn test_dod_standard() {
 fn test_custom_pattern() {
     let dir = tempdir().unwrap();
     let file_path = create_test_file(dir.path(), 1024).unwrap();
-    
+
     let pattern = vec![0xAA, 0x55, 0xAA, 0x55];
     let shredder = Shredder::new(
         WipeStandard::Custom(WipeConfig {
@@ -181,7 +187,7 @@ fn test_flash_wear_leveling() {
 #[test]
 fn test_error_conditions() {
     let dir = tempdir().unwrap();
-    
+
     // Test non-existent file
     let nonexistent = dir.path().join("nonexistent.txt");
     let shredder = Shredder::new(
@@ -199,14 +205,14 @@ fn test_error_conditions() {
     let mut perms = std::fs::metadata(&file_path).unwrap().permissions();
     perms.set_readonly(true);
     std::fs::set_permissions(&file_path, perms).unwrap();
-    
+
     assert!(shredder.wipe(&file_path).is_err());
 }
 
 #[test]
 fn test_verification_levels() {
     let dir = tempdir().unwrap();
-    
+
     for level in [
         VerificationLevel::None,
         VerificationLevel::Basic,
@@ -214,7 +220,7 @@ fn test_verification_levels() {
         VerificationLevel::Enhanced,
     ] {
         let file_path = create_test_file(dir.path(), 4096).unwrap();
-        
+
         let shredder = Shredder::new(
             WipeStandard::Modern(Nist80088Config {
                 method: SanitizationMethod::Clear,
@@ -225,7 +231,10 @@ fn test_verification_levels() {
 
         match shredder.wipe(&file_path) {
             Ok(()) => assert!(!file_path.exists(), "File should be deleted after wiping"),
-            Err(e) => panic!("Failed to wipe file with verification level {:?}: {}", level, e),
+            Err(e) => panic!(
+                "Failed to wipe file with verification level {:?}: {}",
+                level, e
+            ),
         }
     }
 }
@@ -263,20 +272,30 @@ fn test_concurrent_operations() {
         let shredder = Arc::clone(&shredder);
         let handle = thread::spawn(move || {
             if !file_path.exists() {
-                panic!("File {} doesn't exist at start of thread", file_path.display());
+                panic!(
+                    "File {} doesn't exist at start of thread",
+                    file_path.display()
+                );
             }
 
             match shredder.wipe(&file_path) {
                 Ok(()) => {
-                    assert!(!file_path.exists(), 
-                        "File {} should be deleted after wiping", file_path.display());
-                },
-                Err(e) => panic!("Thread {} failed to wipe file {}: {}", 
-                    i, file_path.display(), e),
+                    assert!(
+                        !file_path.exists(),
+                        "File {} should be deleted after wiping",
+                        file_path.display()
+                    );
+                }
+                Err(e) => panic!(
+                    "Thread {} failed to wipe file {}: {}",
+                    i,
+                    file_path.display(),
+                    e
+                ),
             }
         });
         handles.push(handle);
-        
+
         // Add small delay between thread spawns to reduce contention
         thread::sleep(Duration::from_millis(10));
     }
@@ -328,7 +347,7 @@ fn test_empty_file() {
 fn test_sparse_file() {
     let dir = tempdir().unwrap();
     let file_path = dir.path().join("sparse.bin");
-    
+
     // Create a sparse file
     let mut file = File::create(&file_path).unwrap();
     file.set_len(1024 * 1024).unwrap(); // 1MB sparse file
@@ -378,14 +397,14 @@ fn test_all_standards() {
     for standard in standards {
         let dir = tempdir().unwrap();
         let file_path = create_test_file(dir.path(), 4096).unwrap();
-        
-        let shredder = Shredder::new(
-            standard.clone(),
-            mock_storage::mock_hdd().device_type,
-        );
 
-        assert!(shredder.wipe(&file_path).is_ok(), 
-            "Failed with standard: {:?}", standard);
+        let shredder = Shredder::new(standard.clone(), mock_storage::mock_hdd().device_type);
+
+        assert!(
+            shredder.wipe(&file_path).is_ok(),
+            "Failed with standard: {:?}",
+            standard
+        );
         assert!(!file_path.exists());
     }
 }
@@ -394,16 +413,16 @@ fn test_all_standards() {
 #[test]
 fn test_custom_patterns() {
     let patterns = vec![
-        vec![0x55], // Single byte
-        vec![0x55, 0xAA], // Alternating
+        vec![0x55],                   // Single byte
+        vec![0x55, 0xAA],             // Alternating
         vec![0x00, 0xFF, 0x55, 0xAA], // Complex pattern
-        vec![0x12; 1024], // Large pattern
+        vec![0x12; 1024],             // Large pattern
     ];
 
     for pattern in patterns {
         let dir = tempdir().unwrap();
         let file_path = create_test_file(dir.path(), 4096).unwrap();
-        
+
         let shredder = Shredder::new(
             WipeStandard::Custom(WipeConfig {
                 passes: vec![WipePattern::Custom(pattern.clone())],
@@ -412,8 +431,11 @@ fn test_custom_patterns() {
             mock_storage::mock_hdd().device_type,
         );
 
-        assert!(shredder.wipe(&file_path).is_ok(),
-            "Failed with pattern: {:?}", pattern);
+        assert!(
+            shredder.wipe(&file_path).is_ok(),
+            "Failed with pattern: {:?}",
+            pattern
+        );
         assert!(!file_path.exists());
     }
 }
@@ -430,7 +452,7 @@ fn test_different_storage_types() {
     for storage_info in storage_types {
         let dir = tempdir().unwrap();
         let file_path = create_test_file(dir.path(), 4096).unwrap();
-        
+
         let shredder = Shredder::new(
             WipeStandard::Modern(Nist80088Config {
                 method: SanitizationMethod::Clear,
@@ -439,8 +461,11 @@ fn test_different_storage_types() {
             storage_info.device_type.clone(),
         );
 
-        assert!(shredder.wipe(&file_path).is_ok(),
-            "Failed with storage type: {:?}", storage_info.device_type);
+        assert!(
+            shredder.wipe(&file_path).is_ok(),
+            "Failed with storage type: {:?}",
+            storage_info.device_type
+        );
         assert!(!file_path.exists());
     }
 }
@@ -448,7 +473,7 @@ fn test_different_storage_types() {
 // #[test]
 // fn test_buffer_size_configuration() {
 //     let dir = tempdir().unwrap();
-    
+
 //     // Test with small buffer (using smaller test file)
 //     {
 //         let file_path = create_test_file(dir.path(), 64 * 1024).unwrap(); // 64KB file
@@ -473,7 +498,7 @@ fn test_different_storage_types() {
 //             Err(e) => {
 //                 if file_path.exists() {
 //                     let content = std::fs::read(&file_path).unwrap_or_default();
-//                     panic!("Failed to wipe with small buffer: {}. File size: {}, First few bytes: {:?}", 
+//                     panic!("Failed to wipe with small buffer: {}. File size: {}, First few bytes: {:?}",
 //                         e, content.len(), &content[..std::cmp::min(16, content.len())]);
 //                 } else {
 //                     panic!("Failed to wipe with small buffer: {}. File no longer exists.", e);
@@ -500,7 +525,7 @@ fn test_different_storage_types() {
 //             Err(e) => {
 //                 if file_path.exists() {
 //                     let content = std::fs::read(&file_path).unwrap_or_default();
-//                     panic!("Failed to wipe with large buffer: {}. File size: {}, First few bytes: {:?}", 
+//                     panic!("Failed to wipe with large buffer: {}. File size: {}, First few bytes: {:?}",
 //                         e, content.len(), &content[..std::cmp::min(16, content.len())]);
 //                 } else {
 //                     panic!("Failed to wipe with large buffer: {}. File no longer exists.", e);
@@ -526,7 +551,7 @@ fn test_different_storage_types() {
 //             Err(e) => {
 //                 if file_path.exists() {
 //                     let content = std::fs::read(&file_path).unwrap_or_default();
-//                     panic!("Failed to wipe with clamped buffer: {}. File size: {}, First few bytes: {:?}", 
+//                     panic!("Failed to wipe with clamped buffer: {}. File size: {}, First few bytes: {:?}",
 //                         e, content.len(), &content[..std::cmp::min(16, content.len())]);
 //                 } else {
 //                     panic!("Failed to wipe with clamped buffer: {}. File no longer exists.", e);
