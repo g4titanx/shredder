@@ -3,8 +3,6 @@ use std::path::Path;
 
 #[cfg(target_os = "linux")]
 pub fn perform_secure_erase(path: &Path) -> Result<()> {
-    use std::fs::read_to_string; // Add this import
-    use std::os::unix::fs::MetadataExt;
     use std::process::Command;
 
     // Check for root privileges
@@ -86,24 +84,27 @@ fn is_linux_system_disk(path: &Path) -> Result<bool> {
 
 #[cfg(target_os = "linux")]
 fn get_linux_device_info(path: &Path) -> Result<String> {
-    // Try reading from /sys/block/device/model
-    let device_name = path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .ok_or_else(|| {
-            std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid device path")
-        })?;
+    use std::fs::read_to_string;
 
-    let sys_path = Path::new("/sys/block").join(device_name).join("device");
+    // try reading from /sys/block/device/model
+    let device_name = path.file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "Invalid device path"
+        ))?;
+
+    let sys_path = Path::new("/sys/block")
+        .join(device_name)
+        .join("device");
 
     let model = read_to_string(sys_path.join("model")).unwrap_or_default();
     let vendor = read_to_string(sys_path.join("vendor")).unwrap_or_default();
     let transport = read_to_string(sys_path.join("transport")).unwrap_or_default();
 
-    Ok(format!(
-        "{} {} ({})",
-        vendor.trim(),
-        model.trim(),
+    Ok(format!("{} {} ({})", 
+        vendor.trim(), 
+        model.trim(), 
         transport.trim()
     ))
 }
