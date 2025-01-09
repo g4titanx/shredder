@@ -19,7 +19,7 @@ shredder is a secure file deletion tool
 ### from source
 ```bash
 # clone the repository
-git clone https://github.com/yourusername/shred
+git clone https://github.com/g4titanx/shred
 cd shred
 
 # build and install
